@@ -1,0 +1,28 @@
+{
+    "name": "simbiat/htmlcache",
+    "type": "library",
+    "keywords": ["cahce","php","html"],
+    "description": "Caching library specifically designed for web-pages.",
+    "homepage": "https://github.com/Simbiat/htmlcache",
+    "license": "AGPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Dmitry Kustov",
+            "email": "simbiat@outlook.com",
+            "homepage": "https://simbiat.ru",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8"
+    },
+    "autoload": {
+        "psr-4": {
+            "Simbiat\\": "src/"
+        }
+    },
+	"support": {
+		"issues": "https://github.com/Simbiat/htmlcache/issues",
+		"source": "https://github.com/Simbiat/htmlcache"
+	}
+}

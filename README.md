@@ -1,0 +1,2 @@
+# HTMLCache
+Yes, this is a caching library. Yes, I am aware of Symfony/Cache and PSR-6/PSR-16. But I've realised, there is a flaw in those approaches, if we are to provide a consistent web-pages. THis library will try to remidiate this. Meanwhile, since one of my goals is to depend on as few external libraries as possible, there will be no dependencies on mentioned libraries, although, some ideas may be taken from them.
