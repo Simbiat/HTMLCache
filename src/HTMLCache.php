@@ -99,6 +99,9 @@ class HTMLCache
         }
         #Echo the data if we chosed to do it
         if ($direct) {
+            #Send header indicating that response was cached, but live data was sent
+            header('X-Server-Cached: true');
+            header('X-Server-Cache-Hit: false');
             if ($this->zEcho) {
                 (new \Simbiat\http20\Common)->zEcho($string, $cacheStrat);
             } else {
@@ -106,6 +109,7 @@ class HTMLCache
                 exit;
             }
         } else {
+            header('X-Server-Cached: true');
             return $result;
         }
     }
@@ -135,6 +139,8 @@ class HTMLCache
             }
             #Validate data
             if (empty($data)) {
+                #Indicate, that there is no cached version of the data
+                header('X-Server-Cached: false');
                 return false;
             } else {
                 if ($this->cacheValidate($key, $data, $scriptVersion) === true) {
@@ -142,6 +148,8 @@ class HTMLCache
                     if ($direct) {
                         $this->cacheOutput($data);
                     } else {
+                        #Indicate, that there is a cached version of the data
+                        header('X-Server-Cached: true');
                         return $data;
                     }
                 }
@@ -246,6 +254,9 @@ class HTMLCache
         }
         #Send headers
         array_map('header', $data['data']['headers']);
+        #Send header indicating that cached response was sent
+        header('X-Server-Cached: true');
+        header('X-Server-Cache-Hit: true');
         if ($this->zEcho) {
             (new \Simbiat\http20\Common)->zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']));
         } else {
