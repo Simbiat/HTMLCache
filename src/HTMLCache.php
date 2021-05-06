@@ -244,8 +244,8 @@ class HTMLCache
         }
     }
     
-    #Helper function to output cached data
-    private function cacheOutput(array $data): void
+    #Function to output cached data
+    public function cacheOutput(array $data): void
     {
         #Unzip data
         if ($data['zip'] === true) {
