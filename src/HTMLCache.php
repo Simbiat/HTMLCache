@@ -260,6 +260,10 @@ class HTMLCache
         if ($this->zEcho) {
             (new \Simbiat\http20\Common)->zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']));
         } else {
+            #Close session right after if it opened
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_write_close();
+            }
             echo $string;
             exit;
         }
