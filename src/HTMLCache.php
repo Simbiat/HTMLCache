@@ -12,7 +12,7 @@ class HTMLCache
     private bool $zEcho = false;
     private int $maxRandom = 60;
     
-    public function __construct(string $filesPool = '', int $maxRandom = 60)
+    public function __construct(string $filesPool = '', int $maxRandom = 60, int $maxFileAge = 7)
     {
         #Sanitize random value
         if ($maxRandom < 0) {
@@ -37,9 +37,24 @@ class HTMLCache
                 }
             }
         }
-        #If either APCU or files pooling are available - set the flag to true
+        #If either APCU or files pool is available - set the flag to true
         if ($this->files !== '' || $this->apcu === true) {
             $this->poolReady = true;
+        }
+        #Garbage collector for old files, if files pool is used
+        if ($this->files !== '' && $maxFileAge > 0) {
+            #Initiate iterator
+            $fileSI = new \FilesystemIterator($this->files);
+            #Get the oldest allowed time
+            $oldest = time() - ($maxFileAge * 86400);
+            #Iterate the files
+            foreach ($fileSI as $file) {
+                #Check time
+                if ($file->getMTime() <= $oldest) {
+                    #Remove the file
+                    @unlink($file->getPathname());
+                }
+            }  
         }
         #Check if zEcho is available
         if (method_exists('\Simbiat\http20\Common', 'zEcho')) {
