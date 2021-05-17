@@ -49,10 +49,16 @@ class HTMLCache
             $oldest = time() - ($maxFileAge * 86400);
             #Iterate the files
             foreach ($fileSI as $file) {
-                #Check time
-                if ($file->getMTime() <= $oldest) {
-                    #Remove the file
-                    @unlink($file->getPathname());
+                #Using catch to handle potential race condition, when file gets removed by a differnet process before the check gets called
+                try {
+                    #Check time
+                    if ($file->getMTime() <= $oldest) {
+                        #Remove the file
+                        unlink($file->getPathname());
+                    }
+                #Catching Throwable, instead of \Error or \Exception, since we cna't predict what exactly will happen here
+                } catch (\Throwable $e) {
+                    #Do nothing
                 }
             }  
         }
