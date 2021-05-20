@@ -2,16 +2,18 @@
 declare(strict_types=1);
 namespace Simbiat;
 
+use Simbiat\http20\Common;
+
 class HTMLCache
 {
     #Settings initialized on construction
-    private string $version = '';
+    private string $version;
     private bool $apcu = false;
     private string $files = '';
     private bool $poolReady = false;
     private bool $zEcho = false;
-    private int $maxRandom = 60;
-    
+    private int $maxRandom;
+
     public function __construct(string $filesPool = '', int $maxRandom = 60, int $maxFileAge = 7)
     {
         #Sanitize random value
@@ -26,7 +28,7 @@ class HTMLCache
         if (extension_loaded('apcu') && ini_get('apc.enabled')) {
             $this->apcu = true;
         }
-        #Check if filebased pool exists
+        #Check if file-based pool exists
         if (!empty($filesPool)) {
             if (is_dir($filesPool)) {
                 $this->files = rtrim(rtrim($filesPool, '\\'), '/').'/';
@@ -49,25 +51,25 @@ class HTMLCache
             $oldest = time() - ($maxFileAge * 86400);
             #Iterate the files
             foreach ($fileSI as $file) {
-                #Using catch to handle potential race condition, when file gets removed by a differnet process before the check gets called
+                #Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
                 try {
                     #Check time
                     if ($file->getMTime() <= $oldest) {
                         #Remove the file
                         unlink($file->getPathname());
                     }
-                #Catching Throwable, instead of \Error or \Exception, since we cna't predict what exactly will happen here
+                #Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
                 } catch (\Throwable $e) {
                     #Do nothing
                 }
-            }  
+            }
         }
         #Check if zEcho is available
         if (method_exists('\Simbiat\http20\Common', 'zEcho')) {
             $this->zEcho = true;
         }
     }
-    
+
     #Function to store HTML page
     public function set(string $string, string $key ='', int $ttl = 600, int $grace = 600, bool $zip = true, bool $direct = true, string $cacheStrat = ''): bool
     {
@@ -118,23 +120,24 @@ class HTMLCache
         } else {
             $result = false;
         }
-        #Echo the data if we chosed to do it
+        #Send header indicating that response was cached
+        header('X-Server-Cached: true');
+        #Echo the data if we chose to do it
         if ($direct) {
-            #Send header indicating that response was cached, but live data was sent
-            header('X-Server-Cached: true');
+            #Send header indicating that live data was sent
             header('X-Server-Cache-Hit: false');
             if ($this->zEcho) {
-                (new \Simbiat\http20\Common)->zEcho($string, $cacheStrat);
+                (new Common)->zEcho($string, $cacheStrat);
             } else {
                 echo $string;
                 exit;
             }
         } else {
-            header('X-Server-Cached: true');
             return $result;
         }
+        return false;
     }
-    
+
     #Function to get HTML page from cache
     public function get(string $key = '', bool $scriptVersion = true, bool $direct = true): bool|array
     {
@@ -178,7 +181,7 @@ class HTMLCache
         }
         return false;
     }
-    
+
     #Function to remove from cache
     public function delete(string $key = ''): bool
     {
@@ -204,7 +207,7 @@ class HTMLCache
         }
         return true;
     }
-    
+
     #Helper function to write cache data
     private function writeToCache(string $key, array $data): bool
     {
@@ -224,7 +227,7 @@ class HTMLCache
         }
         return true;
     }
-    
+
     #Helper function to validate cache
     private function cacheValidate(string $key, array $data, bool $scriptVersion = true): bool
     {
@@ -239,9 +242,9 @@ class HTMLCache
                 return false;
             } else {
                 #Prepare new set of data
-                $newdata = $data;
-                $newdata['expires'] = time()+$newdata['grace'];
-                $newdata['grace'] = 0;
+                $newData = $data;
+                $newData['expires'] = time()+$newData['grace'];
+                $newData['grace'] = 0;
             }
         }
         #Check script version. This may help avoid situations, when you have updated PHP files, that are responsible for page generation, but there is also a cache version, which uses older revisions, that may provide inappropriate results
@@ -254,9 +257,9 @@ class HTMLCache
         if ($hash !== hash('sha3-256', serialize($data))) {
             return false;
         } else {
-            if (isset($newdata)) {
+            if (isset($newData)) {
                 #Update expiration date in cache to prevent cache slamming
-                $this->writeToCache($key, $newdata);
+                $this->writeToCache($key, $newData);
                 #Return false in order to get up-to-date data
                 return false;
             } else {
@@ -264,7 +267,7 @@ class HTMLCache
             }
         }
     }
-    
+
     #Function to output cached data
     public function cacheOutput(array $data): void
     {
@@ -279,15 +282,14 @@ class HTMLCache
         header('X-Server-Cached: true');
         header('X-Server-Cache-Hit: true');
         if ($this->zEcho) {
-            (new \Simbiat\http20\Common)->zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']));
+            (new Common)->zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']));
         } else {
             #Close session right after if it opened
             if (session_status() === PHP_SESSION_ACTIVE) {
                 session_write_close();
             }
-            echo $string;
+            echo $data['data']['body'];
             exit;
         }
     }
 }
-?>
