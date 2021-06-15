@@ -30,7 +30,7 @@ Here's a simple example of how I'm using it. Scroll further for more details on 
 #Create HTMLCache object
 $HTMLCache = (new \Simbiat\HTMLCache($siteconfig['cachedir'].'html/'));
 #Attempt to use cache
-$HTMLCache->get('', true, true);
+$HTMLCache->get('', true, true, true);
 #Do some processing in case cache was not hit, to get $output
 #Save to cache and output directly
 if ($uri[1] === 'statistics') {
@@ -45,9 +45,9 @@ if ($uri[1] === 'statistics') {
 ## Details on usage
 ### Construct
 ```php
-_construct(string $filesPool = '', int $maxRandom = 60, int $maxFileAge = 7)
+__construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60, int $maxFileAge = 7)
 ```
-When creating the object you can specify path where files of the cache will be stored using `$filesPool`. If empty, this will let the class know, that you do not want to use file storage for caching.
+When creating the object you can specify path where files of the cache will be stored using `$filesPool`. If empty, this will let the class know, that you do not want to use file storage for caching. In that case you need to explicitly enable aPCU caching with setting `$apcu` to `true`. It is set to `false` by default due to potential limitations in resources you may have.
 In order to negate cache slamming, class reduces expiration date during validation by a random amount from 0 to `$maxRandom`, which is defaulted to 60 seconds. You can adjust this number or use 0 to, essentially, disable this feature (not advisable).
 To limit amount of files stored permanently, `$maxFileAge` is used to delete all files, that are older than this amount of days (7 by default). Modification time is checked for this, meaning, that only cache that was not used for the amount of days will be affected. You should adjust this value based on the longest cache time you ahve in your project. Alternatively you can disable the feature by setting the value to 0.
 

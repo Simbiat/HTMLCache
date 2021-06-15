@@ -14,7 +14,7 @@ class HTMLCache
     private bool $zEcho = false;
     private int $maxRandom;
 
-    public function __construct(string $filesPool = '', int $maxRandom = 60, int $maxFileAge = 7)
+    public function __construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60, int $maxFileAge = 7)
     {
         #Sanitize random value
         if ($maxRandom < 0) {
@@ -25,7 +25,7 @@ class HTMLCache
         $usedFiles = get_included_files();
         $this->version = count($usedFiles).'.'.max(max(array_map('filemtime', array_filter($usedFiles, 'is_file'))), getlastmod());
         #Check if APCU is available
-        if (extension_loaded('apcu') && ini_get('apc.enabled')) {
+        if ($apcu && extension_loaded('apcu') && ini_get('apc.enabled')) {
             $this->apcu = true;
         }
         #Check if file-based pool exists
