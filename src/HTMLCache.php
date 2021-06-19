@@ -14,7 +14,7 @@ class HTMLCache
     private bool $zEcho = false;
     private int $maxRandom;
 
-    public function __construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60, int $maxFileAge = 7)
+    public function __construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60, int $maxAge = 7)
     {
         #Sanitize random value
         if ($maxRandom < 0) {
@@ -43,31 +43,12 @@ class HTMLCache
         if ($this->files !== '' || $this->apcu === true) {
             $this->poolReady = true;
         }
-        #Garbage collector for old files, if files pool is used
-        if ($this->files !== '' && $maxFileAge > 0) {
-            #Initiate iterator
-            $fileSI = new \FilesystemIterator($this->files);
-            #Get the oldest allowed time
-            $oldest = time() - ($maxFileAge * 86400);
-            #Iterate the files
-            foreach ($fileSI as $file) {
-                #Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
-                try {
-                    #Check time
-                    if ($file->getMTime() <= $oldest) {
-                        #Remove the file
-                        unlink($file->getPathname());
-                    }
-                #Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
-                } catch (\Throwable $e) {
-                    #Do nothing
-                }
-            }
-        }
         #Check if zEcho is available
         if (method_exists('\Simbiat\HTTP20\Common', 'zEcho')) {
             $this->zEcho = true;
         }
+        #Garbage collectors
+        $this->gc($maxAge * 86400);
     }
 
     #Function to store HTML page
@@ -113,6 +94,7 @@ class HTMLCache
             #Hash the data
             $data['hash'] = hash('sha3-256', serialize($data));
             #Set timings
+            $data['ttl'] = $ttl;
             $data['expires'] = time()+$ttl;
             $data['grace'] = $grace;
             #Write cache
@@ -149,17 +131,19 @@ class HTMLCache
                 $key = hash('sha3-256', $key);
             }
             #Check APCU
-            if ($this->apcu && apcu_exists($key) === true) {
+            if ($this->apcu && apcu_exists('SimbiatHTMLCache_'.$key) === true) {
                 #Get data from cache
-                $data = apcu_fetch($key, $result);
+                $data = apcu_fetch('SimbiatHTMLCache_'.$key, $result);
                 #Check that data was retrieved. If not we will fall through to file.
                 if ($result === false) {
                     $data = NULL;
                 }
             }
+            #Get final path based on hash
+            $finalPath = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
             #Check file
-            if (empty($data) && $this->files !== '' && is_file($this->files.$key) && is_readable($this->files.$key)) {
-                $data = unserialize(file_get_contents($this->files.$key));
+            if (empty($data) && $this->files !== '' && is_file($finalPath.$key) && is_readable($finalPath.$key)) {
+                $data = unserialize(file_get_contents($finalPath.$key));
             }
             #Validate data
             if (empty($data)) {
@@ -192,15 +176,17 @@ class HTMLCache
             $key = hash('sha3-256', $key);
         }
         #Remove from APCU
-        if ($this->apcu && apcu_exists($key) === true) {
-            $result = apcu_delete($key);
+        if ($this->apcu && apcu_exists('SimbiatHTMLCache_'.$key) === true) {
+            $result = apcu_delete('SimbiatHTMLCache_'.$key);
             if (!$result) {
                 return false;
             }
         }
+        #Get final path based on hash
+        $finalPath = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
         #Remove file
-        if ($this->files !== '' && is_file($this->files.$key)) {
-            $result = unlink($this->files.$key);
+        if ($this->files !== '' && is_file($finalPath.$key)) {
+            $result = unlink($finalPath.$key);
             if (!$result) {
                 return false;
             }
@@ -213,14 +199,20 @@ class HTMLCache
     {
         #Cache data to APCU
         if ($this->apcu) {
-            $result = apcu_store($key, $data);
+            $result = apcu_store('SimbiatHTMLCache_'.$key, $data, $data['ttl'] ?? 0);
             if (!$result) {
                 return false;
             }
         }
+        #Get final path based on hash
+        $finalPath = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
         #Cache data to file
         if ($this->files !== '') {
-            $result = boolval(file_put_contents($this->files.$key, serialize($data), LOCK_EX));
+            #Create folder if missing
+            if (!is_dir($finalPath)) {
+                mkdir($finalPath, recursive: true);
+            }
+            $result = boolval(file_put_contents($finalPath.$key, serialize($data), LOCK_EX));
             if (!$result) {
                 return false;
             }
@@ -290,6 +282,71 @@ class HTMLCache
             }
             echo $data['data']['body'];
             exit;
+        }
+    }
+
+    #Garbage collector
+    public function gc(int $maxAge = 600): void
+    {
+        if ($maxAge > 0) {
+            #Get the oldest allowed time
+            $oldest = time() - $maxAge;
+            #Garbage collector for old files, if files pool is used
+            if ($this->files !== '') {
+                #Initiate iterator
+                $fileSI = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->files, \FilesystemIterator::CURRENT_AS_PATHNAME | \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST);
+                #Set list of empty folders (removing within iteration seems to cause fatal error)
+                $emptyDirs = [];
+                #Iterate the files
+                foreach ($fileSI as $file) {
+                    #Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
+                    try {
+                        #Check if directory
+                        if (is_dir($file)) {
+                            #Check if empty
+                            if (!(new \RecursiveDirectoryIterator($file, \FilesystemIterator::SKIP_DOTS))->valid()) {
+                                #Remove directory
+                                $emptyDirs[] = $file;
+                            }
+                        } else {
+                            #Check if file and is old enough
+                            if (is_file($file) && filemtime($file) <= $oldest) {
+                                #Remove the file
+                                unlink($file);
+                                #Remove parent directory if empty
+                                if (!(new \RecursiveDirectoryIterator(dirname($file), \FilesystemIterator::SKIP_DOTS))->valid()) {
+                                    $emptyDirs[] = $file;
+                                }
+                            }
+                        }
+                        #Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
+                    } catch (\Throwable) {
+                        #Do nothing
+                    }
+                }
+                #Garbage collector for empty directories
+                foreach ($emptyDirs as $dir) {
+                    #Using catch to handle potential race condition, when directory gets removed by a different process before the check gets called
+                    try {
+                        rmdir($dir);
+                        #Remove parent directory if empty
+                        if (!(new \RecursiveDirectoryIterator(dirname($dir), \FilesystemIterator::SKIP_DOTS))->valid()) {
+                            @rmdir(dirname($dir));
+                        }
+                    } catch (\Throwable) {
+                        #Do nothing
+                    }
+                }
+            }
+            #Garbage collector for APCu if it's enabled.
+            #While APCu is expected to remove old entries itself, it seems like it's behavior is inconsistent somewhat. This allows to enforce garbage collection.
+            if ($this->apcu) {
+                foreach (apcu_cache_info()['cache_list'] as $item) {
+                    if ($item['mtime'] <= $oldest && str_starts_with($item['info'], 'SimbiatHTMLCache_')) {
+                        apcu_delete($item['info']);
+                    }
+                }
+            }
         }
     }
 }

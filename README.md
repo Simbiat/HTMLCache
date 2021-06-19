@@ -45,11 +45,11 @@ if ($uri[1] === 'statistics') {
 ## Details on usage
 ### Construct
 ```php
-__construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60, int $maxFileAge = 7)
+__construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60, int $maxAge = 7)
 ```
 When creating the object you can specify path where files of the cache will be stored using `$filesPool`. If empty, this will let the class know, that you do not want to use file storage for caching. In that case you need to explicitly enable aPCU caching with setting `$apcu` to `true`. It is set to `false` by default due to potential limitations in resources you may have.
 In order to negate cache slamming, class reduces expiration date during validation by a random amount from 0 to `$maxRandom`, which is defaulted to 60 seconds. You can adjust this number or use 0 to, essentially, disable this feature (not advisable).
-To limit amount of files stored permanently, `$maxFileAge` is used to delete all files, that are older than this amount of days (7 by default). Modification time is checked for this, meaning, that only cache that was not used for the amount of days will be affected. You should adjust this value based on the longest cache time you ahve in your project. Alternatively you can disable the feature by setting the value to 0.
+To limit amount of files stored permanently, `$maxAge` is used to delete cahe entries, that are older than this amount of days (7 by default). Modification time is checked for this, meaning, that only cache that was not used for the amount of days will be affected. You should adjust this value based on the longest cache time you ahve in your project. Alternatively you can disable the feature by setting the value to 0.
 
 ### Set
 ```php
@@ -78,3 +78,10 @@ delete(string $key = '')
 ```
 Use `delete` to remove cached item.
 `$key` is an optional value for ID with which the value will be stored. If empty current `REQUEST_URI` will be used (if it's empty `index.php` will be used). Regardless, the value will be hashed for consistency.
+
+### Garbage collection
+```php
+gc(int $maxAge = 600)
+```
+This garbage collection function explicitly removes old entries older than `$maxAge` seconds (600 by default). This is called by constructor normally, but can be explicitly called, if you need to remove entries which are younger than 1 day.
+Will also remove empty directories, when file storage is used.
