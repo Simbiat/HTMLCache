@@ -328,7 +328,7 @@ class HTMLCache
                 foreach ($emptyDirs as $dir) {
                     #Using catch to handle potential race condition, when directory gets removed by a different process before the check gets called
                     try {
-                        rmdir($dir);
+                        @rmdir($dir);
                         #Remove parent directory if empty
                         if (!(new \RecursiveDirectoryIterator(dirname($dir), \FilesystemIterator::SKIP_DOTS))->valid()) {
                             @rmdir(dirname($dir));
