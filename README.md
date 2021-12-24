@@ -45,11 +45,10 @@ if ($uri[1] === 'statistics') {
 ## Details on usage
 ### Construct
 ```php
-__construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60, int $maxAge = 7)
+__construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60)
 ```
 When creating the object you can specify path where files of the cache will be stored using `$filesPool`. If empty, this will let the class know, that you do not want to use file storage for caching. In that case you need to explicitly enable aPCU caching with setting `$apcu` to `true`. It is set to `false` by default due to potential limitations in resources you may have.
 In order to negate cache slamming, class reduces expiration date during validation by a random amount from 0 to `$maxRandom`, which is defaulted to 60 seconds. You can adjust this number or use 0 to, essentially, disable this feature (not advisable).
-To limit amount of files stored permanently, `$maxAge` is used to delete cahe entries, that are older than this amount of days (7 by default). Modification time is checked for this, meaning, that only cache that was not used for the amount of days will be affected. You should adjust this value based on the longest cache time you ahve in your project. Alternatively you can disable the feature by setting the value to 0.
 
 ### Set
 ```php
@@ -81,7 +80,8 @@ Use `delete` to remove cached item.
 
 ### Garbage collection
 ```php
-gc(int $maxAge = 600)
+gc(int $maxAge = 60, int $maxSize = 1024)
 ```
-This garbage collection function explicitly removes old entries older than `$maxAge` seconds (600 by default). This is called by constructor normally, but can be explicitly called, if you need to remove entries which are younger than 1 day.
+This garbage collection function explicitly removes old entries older than `$maxAge` minutes (60 by default) or all the oldest entries until the total size it less than `$maxSize` megabytes.
+Modification time is checked for this, meaning, that only cache that was not used for the amount of days will be affected. You should adjust this value based on the longest cache time you ahve in your project. Alternatively you can disable the feature by setting the value to 0.
 Will also remove empty directories, when file storage is used.

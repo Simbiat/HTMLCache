@@ -14,7 +14,7 @@ class HTMLCache
     private bool $zEcho = false;
     private int $maxRandom;
 
-    public function __construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60, int $maxAge = 7)
+    public function __construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60)
     {
         #Sanitize random value
         if ($maxRandom < 0) {
@@ -23,7 +23,7 @@ class HTMLCache
         $this->maxRandom = $maxRandom;
         #Get version of the scripts based on all files called so far
         $usedFiles = get_included_files();
-        $this->version = count($usedFiles).'.'.max(max(array_map('filemtime', array_filter($usedFiles, 'is_file'))), getlastmod());
+        $this->version = count($usedFiles).'.'.getlastmod();
         #Check if APCU is available
         if ($apcu && extension_loaded('apcu') && ini_get('apc.enabled')) {
             $this->apcu = true;
@@ -47,8 +47,6 @@ class HTMLCache
         if (method_exists('\Simbiat\HTTP20\Common', 'zEcho')) {
             $this->zEcho = true;
         }
-        #Garbage collectors
-        $this->gc($maxAge * 86400);
     }
 
     #Function to store HTML page
@@ -64,7 +62,7 @@ class HTMLCache
             }
             #Set key based on REQUEST_URI
             if (empty($key)) {
-                $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']));
+                $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).http_build_query($_GET ?? []));
             } else {
                 $key = hash('sha3-256', $key);
             }
@@ -126,7 +124,7 @@ class HTMLCache
         if ($this->poolReady) {
             #Set key based on REQUEST_URI
             if (empty($key)) {
-                $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']));
+                $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).http_build_query($_GET ?? []));
             } else {
                 $key = hash('sha3-256', $key);
             }
@@ -171,7 +169,7 @@ class HTMLCache
     {
         #Sanitize key
         if (empty($key)) {
-            $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']));
+            $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).http_build_query($_GET ?? []));
         } else {
             $key = hash('sha3-256', $key);
         }
@@ -245,7 +243,7 @@ class HTMLCache
         }
         #Check hash to reduce chances of serving corrupted data
         $hash = $data['hash'];
-        unset($data['expires'], $data['grace'], $data['hash']);
+        unset($data['ttl'], $data['expires'], $data['grace'], $data['hash']);
         if ($hash !== hash('sha3-256', serialize($data))) {
             return false;
         } else {
@@ -286,22 +284,41 @@ class HTMLCache
     }
 
     #Garbage collector
-    public function gc(int $maxAge = 600): void
+    public function gc(int $maxAge = 60, int $maxSize = 1024): void
     {
-        if ($maxAge > 0) {
+        #Sanitize values
+        if ($maxAge < 0) {
+            #Reset to default 1 hour cache
+            $maxAge = 60 * 60;
+        } else {
+            #Otherwise, convert into minutes (seconds do not make sense here at all)
+            $maxAge = $maxAge * 60;
+        }
+        if ($maxSize < 0) {
+            #Consider that the size limit was removed
+            $maxSize = 0;
+        } else {
+            #Otherwise, convert to megabytes (lower than 1 MB does not make sense)
+            $maxSize = $maxSize * 1024 * 1024;
+        }
+        #Set list of empty folders (removing within iteration seems to cause fatal error)
+        $emptyDirs = [];
+        if ($maxAge > 0 || ($maxSize > 0 && $this->files !== '')) {
             #Get the oldest allowed time
             $oldest = time() - $maxAge;
             #Garbage collector for old files, if files pool is used
             if ($this->files !== '') {
+                $sizeToRemove = 0;
                 #Initiate iterator
                 $fileSI = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->files, \FilesystemIterator::CURRENT_AS_PATHNAME | \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST);
-                #Set list of empty folders (removing within iteration seems to cause fatal error)
-                $emptyDirs = [];
-                #Iterate the files
-                foreach ($fileSI as $file) {
-                    #Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
-                    try {
-                        #Check if directory
+                #List of files to remove
+                $toDelete = [];
+                #List of fresh files with their sizes
+                $fresh = [];
+                #Iterate the files to get size and date first
+                #Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
+                try {
+                    foreach ($fileSI as $file) {
                         if (is_dir($file)) {
                             #Check if empty
                             if (!(new \RecursiveDirectoryIterator($file, \FilesystemIterator::SKIP_DOTS))->valid()) {
@@ -309,43 +326,94 @@ class HTMLCache
                                 $emptyDirs[] = $file;
                             }
                         } else {
-                            #Check if file and is old enough
-                            if (is_file($file) && filemtime($file) <= $oldest) {
-                                #Remove the file
-                                unlink($file);
-                                #Remove parent directory if empty
-                                if (!(new \RecursiveDirectoryIterator(dirname($file), \FilesystemIterator::SKIP_DOTS))->valid()) {
-                                    $emptyDirs[] = $file;
+                            #Check if file
+                            if (is_file($file)) {
+                                #If we have age restriction, check if the age
+                                $time = filemtime($file);
+                                if ($maxSize > 0) {
+                                    $size = filesize($file);
+                                } else {
+                                    $size = 0;
+                                }
+                                if ($maxAge > 0 && $time <= $oldest) {
+                                    #Add to list of files to delete
+                                    $toDelete[] = $file;
+                                    if ($maxSize > 0) {
+                                        $sizeToRemove = $sizeToRemove + $size;
+                                    }
+                                } else {
+                                    #Get date of files to list of fresh cache
+                                    if ($maxSize > 0) {
+                                        $fresh[] = ['path' => $file, 'time' => $time, 'size' => $size];
+                                    }
                                 }
                             }
                         }
-                        #Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
-                    } catch (\Throwable) {
-                        #Do nothing
+                    }
+                #Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
+                } catch (\Throwable) {
+                    #Do nothing
+                }
+                #If we have size limitation and list of fresh items is not empty
+                if ($maxSize > 0 && !empty($fresh)) {
+                    #Calclate total size
+                    $totalSize = array_sum(array_column($fresh,'size')) + $sizeToRemove;
+                    #Check if we are already removing enough. If so - skip further checks
+                    if ($totalSize - $sizeToRemove >= $maxSize) {
+                        #Sort files by time from oldest to newest
+                        usort($fresh, function ($a, $b) {
+                            return $a['time'] <=> $b['time'];
+                        });
+                        #Iterrate list
+                        foreach ($fresh as $file) {
+                            $toDelete[] = $file['path'];
+                            $sizeToRemove = $sizeToRemove + $file['size'];
+                            #Check if removing this file will be enough and break cycle if it is
+                            if ($totalSize - $sizeToRemove < $maxSize) {
+                                break;
+                            }
+                        }
                     }
                 }
-                #Garbage collector for empty directories
-                foreach ($emptyDirs as $dir) {
-                    #Using catch to handle potential race condition, when directory gets removed by a different process before the check gets called
+                foreach ($toDelete as $file) {
+                    #Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
                     try {
-                        @rmdir($dir);
-                        #Remove parent directory if empty
-                        if (!(new \RecursiveDirectoryIterator(dirname($dir), \FilesystemIterator::SKIP_DOTS))->valid()) {
-                            @rmdir(dirname($dir));
+                        #Check if file and is old enough
+                        if (is_file($file)) {
+                            #Remove the file
+                            unlink($file);
+                            #Remove parent directory if empty
+                            if (!(new \RecursiveDirectoryIterator(dirname($file), \FilesystemIterator::SKIP_DOTS))->valid()) {
+                                $emptyDirs[] = $file;
+                            }
                         }
+                    #Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
                     } catch (\Throwable) {
                         #Do nothing
                     }
                 }
             }
             #Garbage collector for APCu if it's enabled.
-            #While APCu is expected to remove old entries itself, it seems like it's behavior is inconsistent somewhat. This allows to enforce garbage collection.
+            #While APCu is expected to remove old entries itself, it seems like its behavior is inconsistent somewhat. This allows to enforce garbage collection.
             if ($this->apcu) {
                 foreach (apcu_cache_info()['cache_list'] as $item) {
                     if ($item['mtime'] <= $oldest && str_starts_with($item['info'], 'SimbiatHTMLCache_')) {
                         apcu_delete($item['info']);
                     }
                 }
+            }
+        }
+        #Garbage collector for empty directories
+        foreach ($emptyDirs as $dir) {
+            #Using catch to handle potential race condition, when directory gets removed by a different process before the check gets called
+            try {
+                @rmdir($dir);
+                #Remove parent directory if empty
+                if (!(new \RecursiveDirectoryIterator(dirname($dir), \FilesystemIterator::SKIP_DOTS))->valid()) {
+                    @rmdir(dirname($dir));
+                }
+            } catch (\Throwable) {
+                #Do nothing
             }
         }
     }
