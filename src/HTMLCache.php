@@ -286,7 +286,7 @@ class HTMLCache
         #Send header indicating that cached response was sent
         header('X-Server-Cached: true');
         header('X-Server-Cache-Hit: true');
-        if ($this->zEcho === false) {
+        if ($this->zEcho) {
             (new Common)->zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']), exit: $exit);
         } else {
             #Close session right after if it opened
