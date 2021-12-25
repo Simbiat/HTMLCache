@@ -14,11 +14,13 @@ class HTMLCache
     private bool $zEcho = false;
     private int $maxRandom;
 
-    public function __construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 60)
+    public function __construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 1)
     {
         #Sanitize random value
         if ($maxRandom < 0) {
             $maxRandom = 60;
+        } else {
+            $maxRandom = $maxRandom * 60;
         }
         $this->maxRandom = $maxRandom;
         #Get version of the scripts based on all files called so far
@@ -50,15 +52,19 @@ class HTMLCache
     }
 
     #Function to store HTML page
-    public function set(string $string, string $key ='', int $ttl = 600, int $grace = 600, bool $zip = true, bool $direct = true, string $cacheStrat = ''): bool
+    public function set(string $string, string $key ='', int $ttl = 60, int $grace = 1, bool $zip = true, bool $direct = true, string $cacheStrat = ''): bool
     {
         if ($this->poolReady) {
             #Sanitize integers
             if ($ttl < 1) {
-                $ttl = 600;
+                $ttl = 3600;
+            } else {
+                $ttl = $ttl * 60;
             }
             if ($grace < 1) {
-                $grace = 600;
+                $grace = 60;
+            } else {
+                $grace = $grace * 60;
             }
             #Set key based on REQUEST_URI
             if (empty($key)) {
