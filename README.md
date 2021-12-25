@@ -64,12 +64,21 @@ Use `set` to write to cache. `$string` is the only mandatory value. Since the cl
 
 ### Get
 ```php
-get(string $key = '', bool $scriptVersion = true, bool $direct = true)
+get(string $key = '', bool $scriptVersion = true, bool $direct = true, bool $staleReturn = false)
 ```
 Use `get` to get the cached data.
 `$key` is an optional value for ID with which the value will be stored. If empty current `REQUEST_URI` will be used (if it's empty `index.php` will be used). Regardless, the value will be hashed for consistency.
 `$scriptVersion` if set to `true`, will force validation of codebase version, as described above. Since this is more of a personal preference, you can disable this feature.
-`$direct` if set to `true` will output the webpage right getting the page. Since we are dealing with webpages, there is not much reason to disable this, but you can do this and, instead, receive an array of representing all the cached data. I doubt it will be useful outside of the class, though.
+`$direct` if set to `true` will output the webpage right getting the page. Since we are dealing with webpages, there is not much reason to disable this, but you can do this and, instead, receive an array of representing all the cached data. I doubt it will be useful outside the class, though.
+`$staleReturn` if set to `true` will allow to manually serve stale content, while generating new content. In a way, similar to how `stale-while-revalidate` in `Cache-Control` header works.
+
+### cacheOutput
+```php
+cacheOutput(array $data, bool $exit = true)
+```
+Use to manually output the data returned by `get`.
+`$data` is the array returned by `get`.
+`$exit` flag allows canceling automatic exit after output (default), in case you plan to do something after it (very useful when using `get` with `$staleReturn = true`).
 
 ### Delete
 ```php

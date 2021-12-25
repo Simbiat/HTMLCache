@@ -107,11 +107,11 @@ class HTMLCache
             $result = false;
         }
         #Send header indicating that response was cached
-        header('X-Server-Cached: true');
+        @header('X-Server-Cached: true');
         #Echo the data if we chose to do it
         if ($direct) {
             #Send header indicating that live data was sent
-            header('X-Server-Cache-Hit: false');
+            @header('X-Server-Cache-Hit: false');
             if ($this->zEcho) {
                 (new Common)->zEcho($string, $cacheStrat);
             } else {
@@ -125,7 +125,7 @@ class HTMLCache
     }
 
     #Function to get HTML page from cache
-    public function get(string $key = '', bool $scriptVersion = true, bool $direct = true): bool|array
+    public function get(string $key = '', bool $scriptVersion = true, bool $direct = true, bool $staleReturn = false): bool|array
     {
         if ($this->poolReady) {
             #Set key based on REQUEST_URI
@@ -162,6 +162,15 @@ class HTMLCache
                     } else {
                         #Indicate, that there is a cached version of the data
                         header('X-Server-Cached: true');
+                        if ($staleReturn) {
+                            $data['stale'] = false;
+                        }
+                        return $data;
+                    }
+                } else {
+                    if (!$direct && $staleReturn) {
+                        header('X-Server-Cached: stale');
+                        $data['stale'] = true;
                         return $data;
                     }
                 }
@@ -249,7 +258,7 @@ class HTMLCache
         }
         #Check hash to reduce chances of serving corrupted data
         $hash = $data['hash'];
-        unset($data['ttl'], $data['expires'], $data['grace'], $data['hash']);
+        unset($data['ttl'], $data['expires'], $data['grace'], $data['hash'], $data['stale']);
         if ($hash !== hash('sha3-256', serialize($data))) {
             return false;
         } else {
@@ -265,7 +274,7 @@ class HTMLCache
     }
 
     #Function to output cached data
-    public function cacheOutput(array $data): void
+    public function cacheOutput(array $data, bool $exit = true): void
     {
         #Unzip data
         if ($data['zip'] === true) {
@@ -277,15 +286,19 @@ class HTMLCache
         #Send header indicating that cached response was sent
         header('X-Server-Cached: true');
         header('X-Server-Cache-Hit: true');
-        if ($this->zEcho) {
-            (new Common)->zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']));
+        if ($this->zEcho === false) {
+            (new Common)->zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']), exit: $exit);
         } else {
             #Close session right after if it opened
             if (session_status() === PHP_SESSION_ACTIVE) {
                 session_write_close();
             }
             echo $data['data']['body'];
-            exit;
+            if ($exit) {
+                exit;
+            } else {
+                @ob_end_clean();
+            }
         }
     }
 
