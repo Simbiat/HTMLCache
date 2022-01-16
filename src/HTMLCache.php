@@ -152,7 +152,7 @@ class HTMLCache
             #Validate data
             if (empty($data)) {
                 #Indicate, that there is no cached version of the data
-                header('X-Server-Cached: false');
+                @header('X-Server-Cached: false');
                 return false;
             } else {
                 if ($this->cacheValidate($key, $data, $scriptVersion) === true) {
@@ -161,7 +161,7 @@ class HTMLCache
                         $this->cacheOutput($data);
                     } else {
                         #Indicate, that there is a cached version of the data
-                        header('X-Server-Cached: true');
+                        @header('X-Server-Cached: true');
                         if ($staleReturn) {
                             $data['stale'] = false;
                         }
@@ -169,7 +169,7 @@ class HTMLCache
                     }
                 } else {
                     if (!$direct && $staleReturn) {
-                        header('X-Server-Cached: stale');
+                        @header('X-Server-Cached: stale');
                         $data['stale'] = true;
                         return $data;
                     }
@@ -284,8 +284,8 @@ class HTMLCache
         #Send headers
         array_map('header', $data['data']['headers']);
         #Send header indicating that cached response was sent
-        header('X-Server-Cached: true');
-        header('X-Server-Cache-Hit: true');
+        @header('X-Server-Cached: true');
+        @header('X-Server-Cache-Hit: true');
         if ($this->zEcho) {
             (new Common)->zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']), exit: $exit);
         } else {
