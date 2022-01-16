@@ -36,7 +36,7 @@ class HTMLCache
                 $this->files = rtrim(rtrim($filesPool, '\\'), '/').'/';
             } else {
                 #If it does not exist, attempt to create it
-                if (mkdir($filesPool, recursive: true)) {
+                if (@mkdir($filesPool, recursive: true)) {
                     $this->files = rtrim(rtrim($filesPool, '\\'), '/').'/';
                 }
             }
@@ -223,7 +223,7 @@ class HTMLCache
         if ($this->files !== '') {
             #Create folder if missing
             if (!is_dir($finalPath)) {
-                mkdir($finalPath, recursive: true);
+                @mkdir($finalPath, recursive: true);
             }
             $result = boolval(file_put_contents($finalPath.$key, serialize($data), LOCK_EX));
             if (!$result) {
