@@ -33,11 +33,11 @@ class HTMLCache
         #Check if file-based pool exists
         if (!empty($filesPool)) {
             if (is_dir($filesPool)) {
-                $this->files = rtrim(rtrim($filesPool, '\\'), '/').'/';
+                $this->files = mb_rtrim(mb_rtrim($filesPool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
             } else {
                 #If it does not exist, attempt to create it
                 if (@mkdir($filesPool, recursive: true)) {
-                    $this->files = rtrim(rtrim($filesPool, '\\'), '/').'/';
+                    $this->files = mb_rtrim(mb_rtrim($filesPool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
                 }
             }
         }
