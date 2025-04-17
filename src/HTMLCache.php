@@ -116,7 +116,7 @@ class HTMLCache
                 (new Common)->zEcho($string, $cacheStrat);
             } else {
                 echo $string;
-                exit;
+                exit(0);
             }
         } else {
             return $result;
@@ -295,7 +295,7 @@ class HTMLCache
             }
             echo $data['data']['body'];
             if ($exit) {
-                exit;
+                exit(0);
             } else {
                 @ob_end_clean();
             }

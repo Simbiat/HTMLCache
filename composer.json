@@ -14,7 +14,7 @@
         }
     ],
     "require": {
-        "php": "^8"
+        "php": "^8.4"
     },
     "suggest": {
         "simbiat/http20": "Provides 'zEcho' for direct output of cached data"
