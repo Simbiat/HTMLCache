@@ -39,7 +39,7 @@ if ($uri[1] === 'statistics') {
     $HTMLCache->set($output, '', 259200, 600, true, true);
 }
 #Output page if not required to cache
-(new \Simbiat\HTTP20\Common)->zEcho($output);
+(new \Simbiat\http20\Common)->zEcho($output);
 ```
 
 ## Details on usage

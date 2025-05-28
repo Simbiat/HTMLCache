@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace Simbiat;
 
-use Simbiat\HTTP20\Common;
+use Simbiat\http20\Common;
 
 class HTMLCache
 {
@@ -46,7 +46,7 @@ class HTMLCache
             $this->poolReady = true;
         }
         #Check if zEcho is available
-        if (method_exists('\Simbiat\HTTP20\Common', 'zEcho')) {
+        if (method_exists('\Simbiat\http20\Common', 'zEcho')) {
             $this->zEcho = true;
         }
     }
