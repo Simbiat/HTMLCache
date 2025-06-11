@@ -14,18 +14,16 @@
         }
     ],
     "require": {
-        "php": "^8.4"
-    },
-    "suggest": {
-        "simbiat/http20": "Provides 'zEcho' for direct output of cached data"
+        "php": "^8.4",
+        "simbiat/http20": ""
     },
     "autoload": {
         "psr-4": {
             "Simbiat\\": "src/"
         }
     },
-	"support": {
-		"issues": "https://github.com/Simbiat/htmlcache/issues",
-		"source": "https://github.com/Simbiat/htmlcache"
-	}
+    "support": {
+        "issues": "https://github.com/Simbiat/htmlcache/issues",
+        "source": "https://github.com/Simbiat/htmlcache"
+    }
 }

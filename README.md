@@ -28,15 +28,15 @@ That's not all: it has other features, that may be useful:
 Here's a simple example of how I'm using it. Scroll further for more details on the functions.
 ```php
 #Create HTMLCache object
-$HTMLCache = (new \Simbiat\HTMLCache($siteconfig['cachedir'].'html/'));
+$html_cache = (new \Simbiat\HTMLCache($siteconfig['cachedir'].'html/'));
 #Attempt to use cache
-$HTMLCache->get('', true, true, true);
+$html_cache->get('', true, true, true);
 #Do some processing in case cache was not hit, to get $output
 #Save to cache and output directly
 if ($uri[1] === 'statistics') {
-    $HTMLCache->set($output, '', 604800, 600, true, true);
+    $html_cache->set($output, '', 604800, 600, true, true);
 } elseif ($uri[1] === 'achievement') {
-    $HTMLCache->set($output, '', 259200, 600, true, true);
+    $html_cache->set($output, '', 259200, 600, true, true);
 }
 #Output page if not required to cache
 (new \Simbiat\http20\Common)->zEcho($output);
