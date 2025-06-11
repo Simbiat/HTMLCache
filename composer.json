@@ -15,7 +15,7 @@
     ],
     "require": {
         "php": "^8.4",
-        "simbiat/http20": ""
+        "simbiat/http20": "^2.2.2"
     },
     "autoload": {
         "psr-4": {
