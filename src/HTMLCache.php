@@ -86,7 +86,7 @@ class HTMLCache
                 'key' => $key,
                 'zip' => $zip,
                 'version' => $this->version,
-                'cacheStrat' => $cache_strat,
+                'cache_strategy' => $cache_strat,
                 'uri' => $_SERVER['REQUEST_URI'],
                 'data' => $data,
             ];
@@ -185,18 +185,18 @@ class HTMLCache
                 return false;
             }
         }
-        #Get final path based on hash
-        $finalPath = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
-        #Remove file
-        if ($this->files !== '' && is_file($finalPath.$key)) {
-            $result = unlink($finalPath.$key);
+        #Get the final path based on hash
+        $final_path = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
+        #Remove the file
+        if ($this->files !== '' && is_file($final_path.$key)) {
+            $result = unlink($final_path.$key);
             if (!$result) {
                 return false;
             }
         }
         return true;
     }
-
+    
     #Helper function to write cache data
     private function writeToCache(string $key, array $data): bool
     {
@@ -274,7 +274,7 @@ class HTMLCache
         #Send header indicating that cached response was sent
         @header('X-Server-Cached: true');
         @header('X-Server-Cache-Hit: true');
-        Common::zEcho($data['data']['body'], (empty($data['cacheStrat']) ? '' : $data['cacheStrat']), exit: $exit);
+        Common::zEcho($data['data']['body'], (empty($data['cache_strategy']) ? '' : $data['cache_strategy']), exit: $exit);
     }
     
     #Garbage collector
@@ -296,7 +296,7 @@ class HTMLCache
             $max_size *= 1024 * 1024;
         }
         #Set list of empty folders (removing within iteration seems to cause fatal error)
-        $emptyDirs = [];
+        $empty_dirs = [];
         if ($max_age > 0 || ($max_size > 0 && $this->files !== '')) {
             #Get the oldest allowed time
             $oldest = time() - $max_age;
@@ -317,7 +317,7 @@ class HTMLCache
                             #Check if empty
                             if (!new \RecursiveDirectoryIterator($file, \FilesystemIterator::SKIP_DOTS)->valid()) {
                                 #Remove directory
-                                $emptyDirs[] = $file;
+                                $empty_dirs[] = $file;
                             }
                         } else {
                             #Check if file
@@ -378,7 +378,7 @@ class HTMLCache
                             unlink($file);
                             #Remove parent directory if empty
                             if (!(new \RecursiveDirectoryIterator(dirname($file), \FilesystemIterator::SKIP_DOTS))->valid()) {
-                                $emptyDirs[] = $file;
+                                $empty_dirs[] = $file;
                             }
                         }
                     #Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
@@ -398,7 +398,7 @@ class HTMLCache
             }
         }
         #Garbage collector for empty directories
-        foreach ($emptyDirs as $dir) {
+        foreach ($empty_dirs as $dir) {
             #Using catch to handle potential race condition, when directory gets removed by a different process before the check gets called
             try {
                 @rmdir($dir);

@@ -11,8 +11,8 @@ Some may say that these are minor issues, and he may be right, that they are unl
 That's why I've decided to write my own solution, designed specifically for web pages.
 First problem is solved by calculating the version of the code base like this:
 ```php
-$usedFiles = get_included_files();
-$this->version = count($usedFiles).'.'.max(max(array_map('filemtime', array_filter($usedFiles, 'is_file'))),
+$used_files = get_included_files();
+$this->version = count($used_files).'.'.max(max(array_map('filemtime', array_filter($used_files, 'is_file'))),
 ```
 Then this version is stored in the cache for each designated key. When getting the data out of cache it will be matched with current one and if they do not match, it will be treated as a cache miss. This is not a 100% guarantee, but since I have a main "gateway" file that handles all the page generation, it works for me just fine.
 Second problem is solved by caching headers sent along with the data. Once the data is retrieved the same headers will be sent once again.
@@ -45,14 +45,14 @@ if ($uri[1] === 'statistics') {
 ## Details on usage
 ### Construct
 ```php
-__construct(string $filesPool = '', bool $apcu = false, int $maxRandom = 1)
+__construct(string $files_pool = '', bool $apcu = false, int $max_random = 1)
 ```
-When creating the object you can specify path where files of the cache will be stored using `$filesPool`. If empty, this will let the class know, that you do not want to use file storage for caching. In that case you need to explicitly enable aPCU caching with setting `$apcu` to `true`. It is set to `false` by default due to potential limitations in resources you may have.
-In order to negate cache slamming, class reduces expiration date during validation by a random amount from 0 to `$maxRandom`, which is defaulted to 1 minute. You can adjust this number or use 0 to, essentially, disable this feature (not advisable).
+When creating the object you can specify path where files of the cache will be stored using `$files_pool`. If empty, this will let the class know, that you do not want to use file storage for caching. In that case you need to explicitly enable aPCU caching with setting `$apcu` to `true`. It is set to `false` by default due to potential limitations in resources you may have.
+To negate cache slamming, class reduces expiration date during validation by a random amount from 0 to `$max_random`, which is defaulted to 1 minute. You can adjust this number or use 0 to, essentially, disable this feature (not advisable).
 
 ### Set
 ```php
-set(string $string, string $key ='', int $ttl = 60, int $grace = 100, bool $zip = true, bool $direct = true, string $cacheStrat = '')
+set(string $string, string $key ='', int $ttl = 60, int $grace = 100, bool $zip = true, bool $direct = true, string $cache_strategy = '')
 ```
 Use `set` to write to cache. `$string` is the only mandatory value. Since the class is designed for HTML pages, we are restricting the type of the value to `string` only.
 `$key` is an optional value for ID with which the value will be stored. If empty current `REQUEST_URI` will be used (if it's empty `index.php` will be used). Regardless, the value will be hashed for consistency.
@@ -60,17 +60,17 @@ Use `set` to write to cache. `$string` is the only mandatory value. Since the cl
 `$grace` is an optional grace period to help with cache slamming. When cache hit is successful, but it has expired, class updates the expiration value to `time()+$grace` and sets `$grace = 0`. This helps with concurrent requests, so that they will still receive the stale data for extra seconds after its expiration, while initial hit updates the cache. Default is 1 minute.
 `$zip` will GZIP the body and headers of the page to save some space. With current processing power and average size of HTML pages, this is a very fast operation, which can help you cache more stuff both in memory and on disk. You can disable it, if you want, by setting it to `false`.
 `$direct` if set to `true` will output the webpage right after cache is written. Since we are dealing with webpages, there is not much reason to do something after we have a generated page, but you can disable this behaviour and, instead, receive a boolean value representing the result of the function.
-`$cacheStrat` is used for setup of `Cache-Control` header (using appropriate [function](https://github.com/Simbiat/HTTP20/blob/main/doc/Headers.md#cachecontrol)) if you are using `zEcho`. This value will also be cached.
+`$cache_strategy` is used for setup of `Cache-Control` header (using appropriate [function](https://github.com/Simbiat/HTTP20/blob/main/doc/Headers.md#cachecontrol)) if you are using `zEcho`. This value will also be cached.
 
 ### Get
 ```php
-get(string $key = '', bool $scriptVersion = true, bool $direct = true, bool $staleReturn = false)
+get(string $key = '', bool $script_version = true, bool $direct = true, bool $stale_return = false)
 ```
 Use `get` to get the cached data.
 `$key` is an optional value for ID with which the value will be stored. If empty current `REQUEST_URI` will be used (if it's empty `index.php` will be used). Regardless, the value will be hashed for consistency.
-`$scriptVersion` if set to `true`, will force validation of codebase version, as described above. Since this is more of a personal preference, you can disable this feature.
+`$script_version` if set to `true`, will force validation of codebase version, as described above. Since this is more of a personal preference, you can disable this feature.
 `$direct` if set to `true` will output the webpage right getting the page. Since we are dealing with webpages, there is not much reason to disable this, but you can do this and, instead, receive an array of representing all the cached data. I doubt it will be useful outside the class, though.
-`$staleReturn` if set to `true` will allow to manually serve stale content, while generating new content. In a way, similar to how `stale-while-revalidate` in `Cache-Control` header works.
+`$stale_return` if set to `true` will allow to manually serve stale content, while generating new content. In a way, similar to how `stale-while-revalidate` in `Cache-Control` header works.
 
 ### cacheOutput
 ```php
@@ -78,7 +78,7 @@ cacheOutput(array $data, bool $exit = true)
 ```
 Use to manually output the data returned by `get`.
 `$data` is the array returned by `get`.
-`$exit` flag allows canceling automatic exit after output (default), in case you plan to do something after it (very useful when using `get` with `$staleReturn = true`).
+`$exit` flag allows canceling automatic exit after output (default), in case you plan to do something after it (invaluable when using `get` with `$stale_return = true`).
 
 ### Delete
 ```php
@@ -89,8 +89,8 @@ Use `delete` to remove cached item.
 
 ### Garbage collection
 ```php
-gc(int $maxAge = 60, int $maxSize = 1024)
+gc(int $max_age = 60, int $max_size = 1024)
 ```
-This garbage collection function explicitly removes old entries older than `$maxAge` minutes (60 by default) or all the oldest entries until the total size it less than `$maxSize` megabytes.
-Modification time is checked for this, meaning, that only cache that was not used for the amount of days will be affected. You should adjust this value based on the longest cache time you ahve in your project. Alternatively you can disable the feature by setting the value to 0.
+This garbage collection function explicitly removes old entries older than `$max_age` minutes (60 by default) or all the oldest entries until the total size it less than `$max_size` megabytes.
+Modification time is checked for this, meaning, that only cache that was not used for the amount of days will be affected. You should adjust this value based on the longest cache time you have in your project. Alternatively, you can disable the feature by setting the value to 0.
 Will also remove empty directories, when file storage is used.
