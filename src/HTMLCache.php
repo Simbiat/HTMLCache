@@ -22,22 +22,20 @@ class HTMLCache
             $max_random *= 60;
         }
         $this->max_random = $max_random;
-        #Get version of the scripts based on all files called so far
-        $used_files = get_included_files();
-        $this->version = count($used_files).'.'.getlastmod();
+        #Get the version of the scripts based on all files called so far
+        $used_files = \get_included_files();
+        $this->version = \count($used_files).'.'.\getlastmod();
         #Check if APCU is available
-        if ($apcu && extension_loaded('apcu') && ini_get('apc.enabled')) {
+        if ($apcu && \extension_loaded('apcu') && \ini_get('apc.enabled')) {
             $this->apcu = true;
         }
         #Check if file-based pool exists
-        if (!empty($files_pool)) {
-            if (is_dir($files_pool)) {
+        if (\preg_match('/^\s*$/u', $files_pool) !== 1) {
+            if (\is_dir($files_pool)) {
                 $this->files = mb_rtrim(mb_rtrim($files_pool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
-            } else {
                 #If it does not exist, attempt to create it
-                if (@mkdir($files_pool, recursive: true)) {
-                    $this->files = mb_rtrim(mb_rtrim($files_pool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
-                }
+            } elseif (\mkdir($files_pool, recursive: true)) {
+                $this->files = mb_rtrim(mb_rtrim($files_pool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
             }
         }
         #If either APCU or files pool is available - set the flag to true
@@ -125,45 +123,42 @@ class HTMLCache
                 $key = hash('sha3-256', $key);
             }
             #Check APCU
-            if ($this->apcu && apcu_exists('SimbiatHTMLCache_'.$key) === true) {
+            if ($this->apcu && \apcu_exists('SimbiatHTMLCache_'.$key) === true) {
                 #Get data from cache
-                $data = apcu_fetch('SimbiatHTMLCache_'.$key, $result);
-                #Check that data was retrieved. If not we will fall through to file.
+                $data = \apcu_fetch('SimbiatHTMLCache_'.$key, $result);
+                #Check that data was retrieved. If not, we will fall through to file.
                 if ($result === false) {
                     $data = NULL;
                 }
             }
             #Get final path based on hash
             $final_path = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
-            #Check file
-            if (empty($data) && $this->files !== '' && is_file($final_path.$key) && is_readable($final_path.$key)) {
-                $data = unserialize(file_get_contents($final_path.$key));
+            #Check the file
+            if (empty($data) && $this->files !== '' && \is_file($final_path.$key) && \is_readable($final_path.$key)) {
+                $data = \unserialize(\file_get_contents($final_path.$key), ['allowed_classes' => []]);
             }
             #Validate data
             if (empty($data)) {
-                #Indicate, that there is no cached version of the data
-                @header('X-Server-Cached: false');
+                #Indicate that there is no cached version of the data
+                @\header('X-Server-Cached: false');
                 return false;
-            } else {
-                if ($this->cacheValidate($key, $data, $script_version) === true) {
-                    #Output data
-                    if ($direct) {
-                        $this->cacheOutput($data);
-                    } else {
-                        #Indicate, that there is a cached version of the data
-                        @header('X-Server-Cached: true');
-                        if ($stale_return) {
-                            $data['stale'] = false;
-                        }
-                        return $data;
-                    }
+            }
+            if ($this->cacheValidate($key, $data, $script_version)) {
+                #Output data
+                if ($direct) {
+                    $this->cacheOutput($data);
                 } else {
-                    if (!$direct && $stale_return) {
-                        @header('X-Server-Cached: stale');
-                        $data['stale'] = true;
-                        return $data;
+                    #Indicate that there is a cached version of the data
+                    @\header('X-Server-Cached: true');
+                    if ($stale_return) {
+                        $data['stale'] = false;
                     }
+                    return $data;
                 }
+            } elseif (!$direct && $stale_return) {
+                @\header('X-Server-Cached: stale');
+                $data['stale'] = true;
+                return $data;
             }
         }
         return false;
@@ -202,20 +197,20 @@ class HTMLCache
     {
         #Cache data to APCU
         if ($this->apcu) {
-            $result = apcu_store('SimbiatHTMLCache_'.$key, $data, $data['ttl'] ?? 0);
+            $result = \apcu_store('SimbiatHTMLCache_'.$key, $data, $data['ttl'] ?? 0);
             if (!$result) {
                 return false;
             }
         }
-        #Get final path based on hash
-        $final_path = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
+        #Get the final path based on hash
+        $final_path = $this->files.mb_substr($key, 0, 2, 'UTF-8').'/'.mb_substr($key, 2, 2, 'UTF-8').'/';
         #Cache data to file
         if ($this->files !== '') {
             #Create folder if missing
-            if (!is_dir($final_path)) {
-                @mkdir($final_path, recursive: true);
+            if (!\is_dir($final_path) && !\mkdir($final_path, recursive: true) && !\is_dir($final_path)) {
+                throw new \RuntimeException(\sprintf('Directory "%s" was not created', $final_path));
             }
-            $result = (bool)file_put_contents($final_path.$key, serialize($data), LOCK_EX);
+            $result = (bool)\file_put_contents($final_path.$key, \serialize($data), \LOCK_EX);
             if (!$result) {
                 return false;
             }
@@ -249,7 +244,7 @@ class HTMLCache
         #Check hash to reduce chances of serving corrupted data
         $hash = $data['hash'];
         unset($data['ttl'], $data['expires'], $data['grace'], $data['hash'], $data['stale']);
-        if ($hash !== hash('sha3-256', serialize($data))) {
+        if (!\hash_equals($hash, \hash('sha3-256', \serialize($data)))) {
             return false;
         }
         if (isset($new_data)) {
@@ -373,26 +368,29 @@ class HTMLCache
                     #Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
                     try {
                         #Check if file and is old enough
-                        if (is_file($file)) {
+                        if (\is_file($file)) {
                             #Remove the file
-                            unlink($file);
+                            \unlink($file);
                             #Remove parent directory if empty
                             if (!(new \RecursiveDirectoryIterator(dirname($file), \FilesystemIterator::SKIP_DOTS))->valid()) {
                                 $empty_dirs[] = $file;
                             }
                         }
-                    #Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
                     } catch (\Throwable) {
                         #Do nothing
                     }
                 }
             }
             #Garbage collector for APCu if it's enabled.
-            #While APCu is expected to remove old entries itself, it seems like its behavior is inconsistent somewhat. This allows to enforce garbage collection.
+            #While APCu is expected to remove old entries itself, it seems like its behavior is inconsistent somewhat. This allows enforcing garbage collection.
             if ($this->apcu) {
-                foreach (apcu_cache_info()['cache_list'] as $item) {
-                    if ($item['mtime'] <= $oldest && str_starts_with($item['info'], 'SimbiatHTMLCache_')) {
-                        apcu_delete($item['info']);
+                $cache_info = \apcu_cache_info();
+                if (\is_array($cache_info)) {
+                    /** @noinspection OffsetOperationsInspection https://github.com/kalessil/phpinspectionsea/issues/1941 */
+                    foreach ($cache_info['cache_list'] as $item) {
+                        if ($item['mtime'] <= $oldest && str_starts_with($item['info'], 'SimbiatHTMLCache_')) {
+                            \apcu_delete($item['info']);
+                        }
                     }
                 }
             }
