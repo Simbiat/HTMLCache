@@ -61,17 +61,17 @@ class HTMLCache
             }
             #Set key based on REQUEST_URI
             if (empty($key)) {
-                $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).http_build_query($_GET ?? []));
+                $key = \hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).\http_build_query($_GET ?? []));
             } else {
-                $key = hash('sha3-256', $key);
+                $key = \hash('sha3-256', $key);
             }
             #GZip data
-            if ($zip && extension_loaded('zlib')) {
-                $body = gzcompress($string, 9, FORCE_GZIP);
-                $headers = gzcompress(serialize(headers_list()), 9, FORCE_GZIP);
+            if ($zip && \extension_loaded('zlib')) {
+                $body = \gzcompress($string, 9, \FORCE_GZIP);
+                $headers = \gzcompress(\serialize(\headers_list()), 9, \FORCE_GZIP);
             } else {
                 $body = $string;
-                $headers = headers_list();
+                $headers = \headers_list();
                 $zip = false;
             }
             #Organize HTTP data
@@ -89,10 +89,10 @@ class HTMLCache
                 'data' => $data,
             ];
             #Hash the data
-            $data['hash'] = hash('sha3-256', serialize($data));
+            $data['hash'] = \hash('sha3-256', \serialize($data));
             #Set timings
             $data['ttl'] = $ttl;
-            $data['expires'] = time() + $ttl;
+            $data['expires'] = \time() + $ttl;
             $data['grace'] = $grace;
             #Write cache
             $result = $this->writeToCache($key, $data);
@@ -100,11 +100,11 @@ class HTMLCache
             $result = false;
         }
         #Send header indicating that response was cached
-        @header('X-Server-Cached: true');
+        @\header('X-Server-Cached: true');
         #Echo the data if we chose to do it
         if ($direct) {
             #Send header indicating that live data was sent
-            @header('X-Server-Cache-Hit: false');
+            @\header('X-Server-Cache-Hit: false');
             Common::zEcho($string, $cache_strat);
         } else {
             return $result;
@@ -118,9 +118,9 @@ class HTMLCache
         if ($this->pool_ready) {
             #Set key based on REQUEST_URI
             if (empty($key)) {
-                $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).http_build_query($_GET ?? []));
+                $key = \hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).\http_build_query($_GET ?? []));
             } else {
-                $key = hash('sha3-256', $key);
+                $key = \hash('sha3-256', $key);
             }
             #Check APCU
             if ($this->apcu && \apcu_exists('SimbiatHTMLCache_'.$key) === true) {
@@ -132,7 +132,7 @@ class HTMLCache
                 }
             }
             #Get final path based on hash
-            $final_path = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
+            $final_path = $this->files.\substr($key, 0, 2).'/'.\substr($key, 2, 2).'/';
             #Check the file
             if (empty($data) && $this->files !== '' && \is_file($final_path.$key) && \is_readable($final_path.$key)) {
                 $data = \unserialize(\file_get_contents($final_path.$key), ['allowed_classes' => []]);
@@ -169,22 +169,22 @@ class HTMLCache
     {
         #Sanitize key
         if (empty($key)) {
-            $key = hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).http_build_query($_GET ?? []));
+            $key = \hash('sha3-256', (empty($_SERVER['REQUEST_URI']) ? 'index.php' : $_SERVER['REQUEST_URI']).\http_build_query($_GET ?? []));
         } else {
-            $key = hash('sha3-256', $key);
+            $key = \hash('sha3-256', $key);
         }
         #Remove from APCU
-        if ($this->apcu && apcu_exists('SimbiatHTMLCache_'.$key) === true) {
-            $result = apcu_delete('SimbiatHTMLCache_'.$key);
+        if ($this->apcu && \apcu_exists('SimbiatHTMLCache_'.$key) === true) {
+            $result = \apcu_delete('SimbiatHTMLCache_'.$key);
             if (!$result) {
                 return false;
             }
         }
         #Get the final path based on hash
-        $final_path = $this->files.substr($key, 0, 2).'/'.substr($key, 2, 2).'/';
+        $final_path = $this->files.\substr($key, 0, 2).'/'.\substr($key, 2, 2).'/';
         #Remove the file
-        if ($this->files !== '' && is_file($final_path.$key)) {
-            $result = unlink($final_path.$key);
+        if ($this->files !== '' && \is_file($final_path.$key)) {
+            $result = \unlink($final_path.$key);
             if (!$result) {
                 return false;
             }
@@ -226,14 +226,14 @@ class HTMLCache
             return false;
         }
         #Check if stale. We use a random seed to allow earlier expiration, which can help with cache slamming
-        if (empty($data['expires']) || $data['expires'] < time() - random_int(0, $this->max_random)) {
+        if (empty($data['expires']) || $data['expires'] < \time() - \random_int(0, $this->max_random)) {
             #Check grace period
             if (empty($data['grace'])) {
                 return false;
             } else {
                 #Prepare new set of data
                 $new_data = $data;
-                $new_data['expires'] = time() + $new_data['grace'];
+                $new_data['expires'] = \time() + $new_data['grace'];
                 $new_data['grace'] = 0;
             }
         }
@@ -261,14 +261,14 @@ class HTMLCache
     {
         #Unzip data
         if ($data['zip'] === true) {
-            $data['data']['body'] = gzdecode($data['data']['body']);
-            $data['data']['headers'] = unserialize(gzdecode($data['data']['headers']), ['allowed_classes' => false]);
+            $data['data']['body'] = \gzdecode($data['data']['body']);
+            $data['data']['headers'] = \unserialize(\gzdecode($data['data']['headers']), ['allowed_classes' => false]);
         }
         #Send headers
-        array_map('header', $data['data']['headers']);
+        \array_map('\header', $data['data']['headers']);
         #Send header indicating that cached response was sent
-        @header('X-Server-Cached: true');
-        @header('X-Server-Cache-Hit: true');
+        @\header('X-Server-Cached: true');
+        @\header('X-Server-Cache-Hit: true');
         Common::zEcho($data['data']['body'], (empty($data['cache_strategy']) ? '' : $data['cache_strategy']), exit: $exit);
     }
     
@@ -294,7 +294,7 @@ class HTMLCache
         $empty_dirs = [];
         if ($max_age > 0 || ($max_size > 0 && $this->files !== '')) {
             #Get the oldest allowed time
-            $oldest = time() - $max_age;
+            $oldest = \time() - $max_age;
             #Garbage collector for old files, if files pool is used
             if ($this->files !== '') {
                 $size_to_remove = 0;
@@ -308,7 +308,7 @@ class HTMLCache
                 #Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
                 try {
                     foreach ($file_iterator as $file) {
-                        if (is_dir($file)) {
+                        if (\is_dir($file)) {
                             #Check if empty
                             if (!new \RecursiveDirectoryIterator($file, \FilesystemIterator::SKIP_DOTS)->valid()) {
                                 #Remove directory
@@ -316,11 +316,11 @@ class HTMLCache
                             }
                         } else {
                             #Check if file
-                            if (is_file($file)) {
+                            if (\is_file($file)) {
                                 #If we have age restriction, check if the age
-                                $time = filemtime($file);
+                                $time = \filemtime($file);
                                 if ($max_size > 0) {
-                                    $size = filesize($file);
+                                    $size = \filesize($file);
                                 } else {
                                     $size = 0;
                                 }
@@ -346,11 +346,11 @@ class HTMLCache
                 #If we have size limitation and list of fresh items is not empty
                 if ($max_size > 0 && !empty($fresh)) {
                     #Calclate total size
-                    $total_size = array_sum(array_column($fresh,'size')) + $size_to_remove;
+                    $total_size = \array_sum(\array_column($fresh,'size')) + $size_to_remove;
                     #Check if we are already removing enough. If so - skip further checks
                     if ($total_size - $size_to_remove >= $max_size) {
                         #Sort files by time from oldest to newest
-                        usort($fresh, static function ($a, $b) {
+                        \usort($fresh, static function ($a, $b) {
                             return $a['time'] <=> $b['time'];
                         });
                         #Iterrate list
@@ -372,7 +372,7 @@ class HTMLCache
                             #Remove the file
                             \unlink($file);
                             #Remove parent directory if empty
-                            if (!(new \RecursiveDirectoryIterator(dirname($file), \FilesystemIterator::SKIP_DOTS))->valid()) {
+                            if (!(new \RecursiveDirectoryIterator(\dirname($file), \FilesystemIterator::SKIP_DOTS))->valid()) {
                                 $empty_dirs[] = $file;
                             }
                         }
@@ -399,10 +399,10 @@ class HTMLCache
         foreach ($empty_dirs as $dir) {
             #Using catch to handle potential race condition, when directory gets removed by a different process before the check gets called
             try {
-                @rmdir($dir);
+                @\rmdir($dir);
                 #Remove parent directory if empty
-                if (!new \RecursiveDirectoryIterator(dirname($dir), \FilesystemIterator::SKIP_DOTS)->valid()) {
-                    @rmdir(dirname($dir));
+                if (!new \RecursiveDirectoryIterator(\dirname($dir), \FilesystemIterator::SKIP_DOTS)->valid()) {
+                    @\rmdir(\dirname($dir));
                 }
             } catch (\Throwable) {
                 #Do nothing
