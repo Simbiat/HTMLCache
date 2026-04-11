@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace Simbiat;
 
 use Simbiat\http20\Common;
+use Simbiat\StringHelpers\Sanitize;
 
 class HTMLCache
 {
@@ -30,7 +31,7 @@ class HTMLCache
             $this->apcu = true;
         }
         #Check if file-based pool exists
-        if (\preg_match('/^\s*$/u', $files_pool) !== 1) {
+        if (!Sanitize::whiteString($files_pool)) {
             if (\is_dir($files_pool)) {
                 $this->files = mb_rtrim(mb_rtrim($files_pool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
                 #If it does not exist, attempt to create it
