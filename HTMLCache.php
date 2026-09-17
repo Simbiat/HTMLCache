@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 namespace Simbiat;
 
 use Simbiat\http20\Common;
@@ -46,7 +47,7 @@ class HTMLCache
     }
 
     // Function to store HTML page
-    public function set(string $string, string $key ='', int $ttl = 60, int $grace = 1, bool $zip = true, bool $direct = true, string $cache_strat = ''): bool
+    public function set(string $string, string $key = '', int $ttl = 60, int $grace = 1, bool $zip = true, bool $direct = true, string $cache_strat = ''): bool
     {
         if ($this->pool_ready) {
             // Sanitize integers
@@ -129,7 +130,7 @@ class HTMLCache
                 $data = \apcu_fetch('SimbiatHTMLCache_'.$key, $result);
                 // Check that data was retrieved. If not, we will fall through to file.
                 if ($result === false) {
-                    $data = NULL;
+                    $data = null;
                 }
             }
             // Get final path based on hash
@@ -211,7 +212,7 @@ class HTMLCache
             if (!\is_dir($final_path) && !\mkdir($final_path, recursive: true) && !\is_dir($final_path)) {
                 throw new \RuntimeException(\sprintf('Directory "%s" was not created', $final_path));
             }
-            $result = (bool)\file_put_contents($final_path.$key, \serialize($data), \LOCK_EX);
+            $result = (bool) \file_put_contents($final_path.$key, \serialize($data), \LOCK_EX);
             if (!$result) {
                 return false;
             }
@@ -340,14 +341,14 @@ class HTMLCache
                             }
                         }
                     }
-                // Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
+                    // Catching Throwable, instead of \Error or \Exception, since we can't predict what exactly will happen here
                 } catch (\Throwable) {
                     // Do nothing
                 }
                 // If we have size limitation and list of fresh items is not empty
                 if ($max_size > 0 && !empty($fresh)) {
                     // Calculate total size
-                    $total_size = \array_sum(\array_column($fresh,'size')) + $size_to_remove;
+                    $total_size = \array_sum(\array_column($fresh, 'size')) + $size_to_remove;
                     // Check if we are already removing enough. If so - skip further checks
                     if ($total_size - $size_to_remove >= $max_size) {
                         // Sort files by time from oldest to newest
