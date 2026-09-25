@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Simbiat;
@@ -34,10 +35,10 @@ class HTMLCache
         // Check if file-based pool exists
         if (!Sanitize::whiteString($files_pool)) {
             if (\is_dir($files_pool)) {
-                $this->files = mb_rtrim(mb_rtrim($files_pool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
+                $this->files = \mb_rtrim(\mb_rtrim($files_pool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
                 // If it does not exist, attempt to create it
             } elseif (\mkdir($files_pool, recursive: true)) {
-                $this->files = mb_rtrim(mb_rtrim($files_pool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
+                $this->files = \mb_rtrim(\mb_rtrim($files_pool, '\\', 'UTF-8'), '/', 'UTF-8').'/';
             }
         }
         // If either APCU or files pool is available - set the flag to true
@@ -83,12 +84,12 @@ class HTMLCache
             ];
             // Organize data for storage
             $data = [
-                'key' => $key,
-                'zip' => $zip,
-                'version' => $this->version,
                 'cache_strategy' => $cache_strat,
-                'uri' => $_SERVER['REQUEST_URI'],
                 'data' => $data,
+                'key' => $key,
+                'uri' => $_SERVER['REQUEST_URI'],
+                'version' => $this->version,
+                'zip' => $zip,
             ];
             // Hash the data
             $data['hash'] = \hash('sha3-256', \serialize($data));
@@ -205,7 +206,7 @@ class HTMLCache
             }
         }
         // Get the final path based on hash
-        $final_path = $this->files.mb_substr($key, 0, 2, 'UTF-8').'/'.mb_substr($key, 2, 2, 'UTF-8').'/';
+        $final_path = $this->files.\mb_substr($key, 0, 2, 'UTF-8').'/'.\mb_substr($key, 2, 2, 'UTF-8').'/';
         // Cache data to file
         if ($this->files !== '') {
             // Create folder if missing
@@ -374,7 +375,7 @@ class HTMLCache
                             // Remove the file
                             \unlink($file);
                             // Remove parent directory if empty
-                            if (!(new \RecursiveDirectoryIterator(\dirname($file), \FilesystemIterator::SKIP_DOTS))->valid()) {
+                            if (!new \RecursiveDirectoryIterator(\dirname($file), \FilesystemIterator::SKIP_DOTS)->valid()) {
                                 $empty_dirs[] = $file;
                             }
                         }
@@ -390,7 +391,7 @@ class HTMLCache
                 if (\is_array($cache_info)) {
                     /** @noinspection OffsetOperationsInspection https://github.com/kalessil/phpinspectionsea/issues/1941 */
                     foreach ($cache_info['cache_list'] as $item) {
-                        if ($item['mtime'] <= $oldest && str_starts_with($item['info'], 'SimbiatHTMLCache_')) {
+                        if ($item['mtime'] <= $oldest && \str_starts_with($item['info'], 'SimbiatHTMLCache_')) {
                             \apcu_delete($item['info']);
                         }
                     }
