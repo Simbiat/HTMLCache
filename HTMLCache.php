@@ -7,7 +7,7 @@ namespace Simbiat;
 use Simbiat\http20\Common;
 use Simbiat\StringHelpers\Sanitize;
 
-class HTMLCache
+final class HTMLCache
 {
     // Settings initialized on construction
     private string $version;
@@ -105,13 +105,13 @@ class HTMLCache
         // Send header indicating that response was cached
         @\header('X-Server-Cached: true');
         // Echo the data if we chose to do it
-        if ($direct) {
-            // Send header indicating that live data was sent
-            @\header('X-Server-Cache-Hit: false');
-            Common::zEcho($string, $cache_strat);
-        } else {
+        if (!$direct) {
             return $result;
         }
+
+        // Send header indicating that live data was sent
+        @\header('X-Server-Cache-Hit: false');
+        Common::zEcho($string, $cache_strat);
         return false;
     }
 
@@ -233,12 +233,12 @@ class HTMLCache
             // Check grace period
             if (empty($data['grace'])) {
                 return false;
-            } else {
-                // Prepare new set of data
-                $new_data = $data;
-                $new_data['expires'] = \time() + $new_data['grace'];
-                $new_data['grace'] = 0;
             }
+
+            // Prepare new set of data
+            $new_data = $data;
+            $new_data['expires'] = \time() + $new_data['grace'];
+            $new_data['grace'] = 0;
         }
         // Check script version. This may help avoid situations, when you have updated PHP files, that are responsible for page generation, but there is also a cache version, which uses older revisions, that may provide inappropriate results
         if ($script_version && $this->version !== $data['version']) {
@@ -322,11 +322,7 @@ class HTMLCache
                             if (\is_file($file)) {
                                 // If we have age restriction, check if the age
                                 $time = \filemtime($file);
-                                if ($max_size > 0) {
-                                    $size = \filesize($file);
-                                } else {
-                                    $size = 0;
-                                }
+                                $size = $max_size > 0 ? \filesize($file) : 0;
                                 if ($max_age > 0 && $time <= $oldest) {
                                     // Add to list of files to delete
                                     $to_delete[] = $file;
