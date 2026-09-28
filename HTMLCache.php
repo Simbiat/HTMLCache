@@ -29,7 +29,11 @@ final class HTMLCache
         $used_files = \get_included_files();
         $this->version = \count($used_files).'.'.\getlastmod();
         // Check if APCU is available
-        if ($apcu && \extension_loaded('apcu') && \ini_get('apc.enabled')) {
+        if (
+            $apcu
+            && \extension_loaded('apcu')
+            && \ini_get('apc.enabled')
+        ) {
             $this->apcu = true;
         }
         // Check if file-based pool exists
@@ -42,7 +46,10 @@ final class HTMLCache
             }
         }
         // If either APCU or files pool is available - set the flag to true
-        if ($this->files !== '' || $this->apcu) {
+        if (
+            $this->files !== ''
+            || $this->apcu
+        ) {
             $this->pool_ready = true;
         }
     }
@@ -69,7 +76,10 @@ final class HTMLCache
                 $key = \hash('sha3-256', $key);
             }
             // GZip data
-            if ($zip && \extension_loaded('zlib')) {
+            if (
+                $zip
+                && \extension_loaded('zlib')
+            ) {
                 $body = \gzcompress($string, 9, \FORCE_GZIP);
                 $headers = \gzcompress(\serialize(\headers_list()), 9, \FORCE_GZIP);
             } else {
@@ -112,6 +122,7 @@ final class HTMLCache
         // Send header indicating that live data was sent
         @\header('X-Server-Cache-Hit: false');
         Common::zEcho($string, $cache_strat);
+
         return false;
     }
 
@@ -126,7 +137,10 @@ final class HTMLCache
                 $key = \hash('sha3-256', $key);
             }
             // Check APCU
-            if ($this->apcu && \apcu_exists('SimbiatHTMLCache_'.$key) === true) {
+            if (
+                $this->apcu
+                && \apcu_exists('SimbiatHTMLCache_'.$key) === true
+            ) {
                 // Get data from cache
                 $data = \apcu_fetch('SimbiatHTMLCache_'.$key, $result);
                 // Check that data was retrieved. If not, we will fall through to file.
@@ -137,13 +151,19 @@ final class HTMLCache
             // Get final path based on hash
             $final_path = $this->files.\substr($key, 0, 2).'/'.\substr($key, 2, 2).'/';
             // Check the file
-            if (empty($data) && $this->files !== '' && \is_file($final_path.$key) && \is_readable($final_path.$key)) {
+            if (
+                empty($data)
+                && $this->files !== ''
+                && \is_file($final_path.$key)
+                && \is_readable($final_path.$key)
+            ) {
                 $data = \unserialize(\file_get_contents($final_path.$key), ['allowed_classes' => []]);
             }
             // Validate data
             if (empty($data)) {
                 // Indicate that there is no cached version of the data
                 @\header('X-Server-Cached: false');
+
                 return false;
             }
             if ($this->cacheValidate($key, $data, $script_version)) {
@@ -156,14 +176,20 @@ final class HTMLCache
                     if ($stale_return) {
                         $data['stale'] = false;
                     }
+
                     return $data;
                 }
-            } elseif (!$direct && $stale_return) {
+            } elseif (
+                !$direct
+                && $stale_return
+            ) {
                 @\header('X-Server-Cached: stale');
                 $data['stale'] = true;
+
                 return $data;
             }
         }
+
         return false;
     }
 
@@ -177,7 +203,10 @@ final class HTMLCache
             $key = \hash('sha3-256', $key);
         }
         // Remove from APCU
-        if ($this->apcu && \apcu_exists('SimbiatHTMLCache_'.$key) === true) {
+        if (
+            $this->apcu
+            && \apcu_exists('SimbiatHTMLCache_'.$key) === true
+        ) {
             $result = \apcu_delete('SimbiatHTMLCache_'.$key);
             if (!$result) {
                 return false;
@@ -186,96 +215,27 @@ final class HTMLCache
         // Get the final path based on hash
         $final_path = $this->files.\substr($key, 0, 2).'/'.\substr($key, 2, 2).'/';
         // Remove the file
-        if ($this->files !== '' && \is_file($final_path.$key)) {
+        if (
+            $this->files !== ''
+            && \is_file($final_path.$key)
+        ) {
             $result = \unlink($final_path.$key);
             if (!$result) {
                 return false;
             }
         }
+
         return true;
     }
 
-    // Helper function to write cache data
-    private function writeToCache(string $key, array $data): bool
-    {
-        // Cache data to APCU
-        if ($this->apcu) {
-            $result = \apcu_store('SimbiatHTMLCache_'.$key, $data, $data['ttl'] ?? 0);
-            if (!$result) {
-                return false;
-            }
-        }
-        // Get the final path based on hash
-        $final_path = $this->files.\mb_substr($key, 0, 2, 'UTF-8').'/'.\mb_substr($key, 2, 2, 'UTF-8').'/';
-        // Cache data to file
-        if ($this->files !== '') {
-            // Create folder if missing
-            if (!\is_dir($final_path) && !\mkdir($final_path, recursive: true) && !\is_dir($final_path)) {
-                throw new \RuntimeException(\sprintf('Directory "%s" was not created', $final_path));
-            }
-            $result = (bool) \file_put_contents($final_path.$key, \serialize($data), \LOCK_EX);
-            if (!$result) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Helper function to validate cache
-    private function cacheValidate(string $key, array $data, bool $script_version = true): bool
-    {
-        // Check key
-        if ($key !== $data['key']) {
-            return false;
-        }
-        // Check if stale. We use a random seed to allow earlier expiration, which can help with cache slamming
-        if (empty($data['expires']) || $data['expires'] < \time() - \random_int(0, $this->max_random)) {
-            // Check grace period
-            if (empty($data['grace'])) {
-                return false;
-            }
-
-            // Prepare new set of data
-            $new_data = $data;
-            $new_data['expires'] = \time() + $new_data['grace'];
-            $new_data['grace'] = 0;
-        }
-        // Check script version. This may help avoid situations, when you have updated PHP files, that are responsible for page generation, but there is also a cache version, which uses older revisions, that may provide inappropriate results
-        if ($script_version && $this->version !== $data['version']) {
-            return false;
-        }
-        // Check hash to reduce chances of serving corrupted data
-        $hash = $data['hash'];
-        unset($data['ttl'], $data['expires'], $data['grace'], $data['hash'], $data['stale']);
-        if (!\hash_equals($hash, \hash('sha3-256', \serialize($data)))) {
-            return false;
-        }
-        if (isset($new_data)) {
-            // Update expiration date in cache to prevent cache slamming
-            $this->writeToCache($key, $new_data);
-            // Return false to get up-to-date data
-            return false;
-        }
-        return true;
-    }
-
-    // Function to output cached data
-    private function cacheOutput(array $data, bool $exit = true): void
-    {
-        // Unzip data
-        if ($data['zip'] === true) {
-            $data['data']['body'] = \gzdecode($data['data']['body']);
-            $data['data']['headers'] = \unserialize(\gzdecode($data['data']['headers']), ['allowed_classes' => false]);
-        }
-        // Send headers
-        \array_map('\header', $data['data']['headers']);
-        // Send header indicating that cached response was sent
-        @\header('X-Server-Cached: true');
-        @\header('X-Server-Cache-Hit: true');
-        Common::zEcho($data['data']['body'], (empty($data['cache_strategy']) ? '' : $data['cache_strategy']), exit: $exit);
-    }
-
-    // Garbage collector
+    /**
+     * Garbage collector
+     *
+     * @param int $max_age
+     * @param int $max_size
+     *
+     * @return void
+     */
     public function gc(int $max_age = 60, int $max_size = 1024): void
     {
         // Sanitize values
@@ -295,7 +255,13 @@ final class HTMLCache
         }
         // Set list of empty folders (removing within iteration seems to cause fatal error)
         $empty_dirs = [];
-        if ($max_age > 0 || ($max_size > 0 && $this->files !== '')) {
+        if (
+            $max_age > 0
+            || (
+                $max_size > 0
+                && $this->files !== ''
+            )
+        ) {
             // Get the oldest allowed time
             $oldest = \time() - $max_age;
             // Garbage collector for old files, if files pool is used
@@ -322,8 +288,13 @@ final class HTMLCache
                             if (\is_file($file)) {
                                 // If we have age restriction, check if the age
                                 $time = \filemtime($file);
-                                $size = $max_size > 0 ? \filesize($file) : 0;
-                                if ($max_age > 0 && $time <= $oldest) {
+                                $size = $max_size > 0
+                                    ? \filesize($file)
+                                    : 0;
+                                if (
+                                    $max_age > 0
+                                    && $time <= $oldest
+                                ) {
                                     // Add to list of files to delete
                                     $to_delete[] = $file;
                                     if ($max_size > 0) {
@@ -343,15 +314,16 @@ final class HTMLCache
                     // Do nothing
                 }
                 // If we have size limitation and list of fresh items is not empty
-                if ($max_size > 0 && !empty($fresh)) {
+                if (
+                    $max_size > 0
+                    && !empty($fresh)
+                ) {
                     // Calculate total size
                     $total_size = \array_sum(\array_column($fresh, 'size')) + $size_to_remove;
                     // Check if we are already removing enough. If so - skip further checks
                     if ($total_size - $size_to_remove >= $max_size) {
                         // Sort files by time from oldest to newest
-                        \usort($fresh, static function ($a, $b) {
-                            return $a['time'] <=> $b['time'];
-                        });
+                        \usort($fresh, static fn($a, $b) => $a['time'] <=> $b['time']);
                         // Iterate list
                         foreach ($fresh as $file) {
                             $to_delete[] = $file['path'];
@@ -387,7 +359,10 @@ final class HTMLCache
                 if (\is_array($cache_info)) {
                     /** @noinspection OffsetOperationsInspection https://github.com/kalessil/phpinspectionsea/issues/1941 */
                     foreach ($cache_info['cache_list'] as $item) {
-                        if ($item['mtime'] <= $oldest && \str_starts_with($item['info'], 'SimbiatHTMLCache_')) {
+                        if (
+                            $item['mtime'] <= $oldest
+                            && \str_starts_with($item['info'], 'SimbiatHTMLCache_')
+                        ) {
                             \apcu_delete($item['info']);
                         }
                     }
@@ -407,5 +382,105 @@ final class HTMLCache
                 // Do nothing
             }
         }
+    }
+
+    /**
+     * Helper function to write cache data
+     *
+     * @param string $key
+     * @param array  $data
+     *
+     * @return bool
+     */
+    private function writeToCache(string $key, array $data): bool
+    {
+        // Cache data to APCU
+        if ($this->apcu) {
+            $result = \apcu_store('SimbiatHTMLCache_'.$key, $data, $data['ttl'] ?? 0);
+            if (!$result) {
+                return false;
+            }
+        }
+        // Get the final path based on hash
+        $final_path = $this->files.\mb_substr($key, 0, 2, 'UTF-8').'/'.\mb_substr($key, 2, 2, 'UTF-8').'/';
+        // Cache data to file
+        if ($this->files !== '') {
+            // Create folder if missing
+            if (
+                !\is_dir($final_path)
+                && !\mkdir($final_path, recursive: true)
+                && !\is_dir($final_path)
+            ) {
+                throw new \RuntimeException(\sprintf('Directory "%s" was not created', $final_path));
+            }
+            $result = (bool) \file_put_contents($final_path.$key, \serialize($data), \LOCK_EX);
+            if (!$result) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Helper function to validate cache
+    private function cacheValidate(string $key, array $data, bool $script_version = true): bool
+    {
+        // Check key
+        if ($key !== $data['key']) {
+            return false;
+        }
+        // Check if stale. We use a random seed to allow earlier expiration, which can help with cache slamming
+        if (
+            empty($data['expires'])
+            || $data['expires'] < \time() - \random_int(0, $this->max_random)
+        ) {
+            // Check grace period
+            if (empty($data['grace'])) {
+                return false;
+            }
+
+            // Prepare new set of data
+            $new_data = $data;
+            $new_data['expires'] = \time() + $new_data['grace'];
+            $new_data['grace'] = 0;
+        }
+        // Check script version. This may help avoid situations, when you have updated PHP files, that are responsible for page generation, but there is also a cache version, which uses older revisions, that may provide inappropriate results
+        if (
+            $script_version
+            && $this->version !== $data['version']
+        ) {
+            return false;
+        }
+        // Check hash to reduce chances of serving corrupted data
+        $hash = $data['hash'];
+        unset($data['ttl'], $data['expires'], $data['grace'], $data['hash'], $data['stale']);
+        if (!\hash_equals($hash, \hash('sha3-256', \serialize($data)))) {
+            return false;
+        }
+        if (isset($new_data)) {
+            // Update expiration date in cache to prevent cache slamming
+            $this->writeToCache($key, $new_data);
+
+            // Return false to get up-to-date data
+            return false;
+        }
+
+        return true;
+    }
+
+    // Function to output cached data
+    private function cacheOutput(array $data, bool $exit = true): void
+    {
+        // Unzip data
+        if ($data['zip'] === true) {
+            $data['data']['body'] = \gzdecode($data['data']['body']);
+            $data['data']['headers'] = \unserialize(\gzdecode($data['data']['headers']), ['allowed_classes' => false]);
+        }
+        // Send headers
+        \array_map('\header', $data['data']['headers']);
+        // Send header indicating that cached response was sent
+        @\header('X-Server-Cached: true');
+        @\header('X-Server-Cache-Hit: true');
+        Common::zEcho($data['data']['body'], (empty($data['cache_strategy']) ? '' : $data['cache_strategy']), exit: $exit);
     }
 }
