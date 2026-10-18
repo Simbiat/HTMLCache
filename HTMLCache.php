@@ -127,7 +127,7 @@ final class HTMLCache
     }
 
     // Function to get HTML page from cache
-    public function get(string $key = '', bool $script_version = true, bool $direct = true, bool $stale_return = false): bool|array
+    public function get(string $key = '', bool $script_version = true, bool $direct = true, bool $stale_return = false): array|bool
     {
         if ($this->pool_ready) {
             // Set key based on REQUEST_URI
@@ -229,7 +229,7 @@ final class HTMLCache
     }
 
     /**
-     * Garbage collector
+     * Garbage collector.
      *
      * @param int $max_age
      * @param int $max_size
@@ -273,6 +273,7 @@ final class HTMLCache
                 $to_delete = [];
                 // List of fresh files with their sizes
                 $fresh = [];
+
                 // Iterate the files to get size and date first
                 // Using catch to handle potential race condition, when file gets removed by a different process before the check gets called
                 try {
@@ -357,7 +358,7 @@ final class HTMLCache
             if ($this->apcu) {
                 $cache_info = \apcu_cache_info();
                 if (\is_array($cache_info)) {
-                    /** @noinspection OffsetOperationsInspection https://github.com/kalessil/phpinspectionsea/issues/1941 */
+                    /* @noinspection OffsetOperationsInspection https://github.com/kalessil/phpinspectionsea/issues/1941 */
                     foreach ($cache_info['cache_list'] as $item) {
                         if (
                             $item['mtime'] <= $oldest
@@ -385,7 +386,7 @@ final class HTMLCache
     }
 
     /**
-     * Helper function to write cache data
+     * Helper function to write cache data.
      *
      * @param string $key
      * @param array  $data
