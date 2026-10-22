@@ -9,7 +9,9 @@ use Simbiat\StringHelpers\Sanitize;
 
 final class HTMLCache
 {
-    // Settings initialized on construction
+    /**
+     * @var string Settings initialized on construction
+     */
     private readonly string $version;
 
     private bool $apcu = false;
@@ -61,7 +63,19 @@ final class HTMLCache
         }
     }
 
-    // Function to store HTML page
+    /**
+     * Function to store HTML page
+     *
+     * @param string $string
+     * @param string $key
+     * @param int    $ttl
+     * @param int    $grace
+     * @param bool   $zip
+     * @param bool   $direct
+     * @param string $cache_strat
+     *
+     * @return bool
+     */
     public function set(string $string, string $key = '', int $ttl = 60, int $grace = 1, bool $zip = true, bool $direct = true, string $cache_strat = ''): bool
     {
         if ($this->pool_ready) {
@@ -138,7 +152,16 @@ final class HTMLCache
         return false;
     }
 
-    // Function to get HTML page from cache
+    /**
+     * Function to get HTML page from cache
+     *
+     * @param string $key
+     * @param bool   $script_version
+     * @param bool   $direct
+     * @param bool   $stale_return
+     *
+     * @return array|bool
+     */
     public function get(string $key = '', bool $script_version = true, bool $direct = true, bool $stale_return = false): array|bool
     {
         if ($this->pool_ready) {
@@ -209,7 +232,13 @@ final class HTMLCache
         return false;
     }
 
-    // Function to remove from cache
+    /**
+     * Function to remove from cache
+     *
+     * @param string $key
+     *
+     * @return bool
+     */
     public function delete(string $key = ''): bool
     {
         // Sanitize key
@@ -450,8 +479,9 @@ final class HTMLCache
         return true;
     }
 
-    // Helper function to validate cache
     /**
+     * Helper function to validate cache
+     *
      * @param array<string, mixed> $data
      */
     private function cacheValidate(string $key, array $data, bool $script_version = true): bool
@@ -504,8 +534,9 @@ final class HTMLCache
         return true;
     }
 
-    // Function to output cached data
     /**
+     * Function to output cached data
+     *
      * @param array<string, mixed> $data
      */
     private function cacheOutput(array $data, bool $exit = true): void
